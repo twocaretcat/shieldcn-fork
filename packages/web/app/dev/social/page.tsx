@@ -27,6 +27,9 @@ type Variant = (typeof VARIANTS)[number]
 const SIZES = ["xs", "sm", "default", "lg"] as const
 type Size = (typeof SIZES)[number]
 
+const FONTS = ["inter", "geist", "geist-mono", "jetbrains-mono", "fira-code", "roboto", "space-grotesk"] as const
+type Font = (typeof FONTS)[number]
+
 const ANIMATES = ["none", "pulse", "glow", "shimmer"] as const
 type Animate = (typeof ANIMATES)[number]
 
@@ -49,6 +52,7 @@ interface BadgeItem {
   path: string
   variant: Variant
   size: Size
+  font: Font
   animate: Animate
   label: LabelKind
   labelText: string // used when label === "custom"
@@ -83,6 +87,7 @@ function buildSrc(item: BadgeItem, mode: Bg): string {
   params.set("variant", item.variant)
   params.set("mode", mode === "black" ? "dark" : "light")
   if (item.size !== "sm") params.set("size", item.size)
+  if (item.font !== "inter") params.set("font", item.font)
   if (item.animate !== "none") params.set("animate", item.animate)
   return `${item.path}.svg?${params.toString()}`
 }
@@ -92,6 +97,7 @@ function buildGifUrl(item: BadgeItem, mode: Bg): string {
   params.set("variant", item.variant)
   params.set("mode", mode === "black" ? "dark" : "light")
   if (item.size !== "sm") params.set("size", item.size)
+  if (item.font !== "inter") params.set("font", item.font)
   if (item.animate !== "none") params.set("animate", item.animate)
   return `${item.path}.gif?${params.toString()}`
 }
@@ -126,9 +132,13 @@ async function downloadGif(item: BadgeItem, mode: Bg): Promise<void> {
 }
 
 const DEFAULT_ITEMS: BadgeItem[] = [
-  { id: nextId(), path: "/npm/react", variant: "branded", size: "sm", animate: "none", label: "none", labelText: "" },
-  { id: nextId(), path: "/github/stars/vercel/next.js", variant: "branded", size: "sm", animate: "none", label: "none", labelText: "" },
-  { id: nextId(), path: "/badge/built_with-shieldcn-blue", variant: "default", size: "sm", animate: "none", label: "none", labelText: "" },
+  { id: nextId(), path: "/badge/font-Inter-a78bfa", variant: "branded", size: "sm", font: "inter", animate: "none", label: "variant", labelText: "" },
+  { id: nextId(), path: "/badge/font-Geist-34d399", variant: "branded", size: "sm", font: "geist", animate: "none", label: "variant", labelText: "" },
+  { id: nextId(), path: "/badge/font-Geist Mono-22d3ee", variant: "branded", size: "sm", font: "geist-mono", animate: "none", label: "variant", labelText: "" },
+  { id: nextId(), path: "/badge/font-JetBrains Mono-facc15", variant: "branded", size: "sm", font: "jetbrains-mono", animate: "none", label: "variant", labelText: "" },
+  { id: nextId(), path: "/badge/font-Fira Code-fb923c", variant: "branded", size: "sm", font: "fira-code", animate: "none", label: "variant", labelText: "" },
+  { id: nextId(), path: "/badge/font-Roboto-60a5fa", variant: "branded", size: "sm", font: "roboto", animate: "none", label: "variant", labelText: "" },
+  { id: nextId(), path: "/badge/font-Space Grotesk-f472b6", variant: "branded", size: "sm", font: "space-grotesk", animate: "none", label: "variant", labelText: "" },
 ]
 
 // ---------------------------------------------------------------------------
@@ -146,6 +156,7 @@ function buildBaseSrc(item: BadgeItem, mode: Bg): string {
   params.set("variant", item.variant)
   params.set("mode", mode === "black" ? "dark" : "light")
   if (item.size !== "sm") params.set("size", item.size)
+  if (item.font !== "inter") params.set("font", item.font)
   return `${item.path}.svg?${params.toString()}`
 }
 
@@ -230,6 +241,7 @@ function ItemControls({
       <span className="font-mono text-[11px] text-zinc-400 truncate max-w-[180px]" title={item.path}>{item.path}</span>
       <Select value={item.variant} options={VARIANTS} onChange={(v) => onChange({ variant: v })} />
       <Select value={item.size} options={SIZES} onChange={(v) => onChange({ size: v })} />
+      <Select value={item.font} options={FONTS} onChange={(v) => onChange({ font: v as Font })} />
       <Select value={item.animate} options={ANIMATES} onChange={(v) => onChange({ animate: v })} />
       <span className="font-mono text-[10px] text-zinc-600">label</span>
       <Select value={item.label} options={LABELS} onChange={(v) => onChange({ label: v })} />
@@ -284,6 +296,7 @@ export default function DevSocialPage() {
   const [bg, setBg] = useState<Bg>("black")
   const [gap, setGap] = useState(16)
   const [showText, setShowText] = useState(false)
+  const [showLogo, setShowLogo] = useState(true)
   const [title, setTitle] = useState("shieldcn")
   const [subtitle, setSubtitle] = useState("Beautiful README badges")
   const [saving, setSaving] = useState(false)
@@ -326,7 +339,7 @@ export default function DevSocialPage() {
     const path = normalizePath(input)
     if (!path) return
     if (items.some((b) => b.path === path)) { setInput(""); return }
-    setItems((prev) => [...prev, { id: nextId(), path, variant: "branded", size: "sm", animate: "none", label: "none", labelText: "" }])
+    setItems((prev) => [...prev, { id: nextId(), path, variant: "branded", size: "sm", font: "inter", animate: "none", label: "none", labelText: "" }])
     setInput("")
   }, [input, items])
 
@@ -377,6 +390,8 @@ export default function DevSocialPage() {
       const subEl = node.querySelector("[data-canvas-subtitle]") as HTMLElement | null
       const titleBox = titleEl ? titleEl.getBoundingClientRect() : null
       const subBox = subEl ? subEl.getBoundingClientRect() : null
+      const logoEl = node.querySelector("[data-canvas-logo]") as HTMLElement | null
+      const logoBox = logoEl ? logoEl.getBoundingClientRect() : null
 
       // Per-badge variant labels (if shown) — capture text, center, baseline.
       const labels = items
@@ -438,6 +453,23 @@ export default function DevSocialPage() {
         ctx.fillStyle = canvasBgHex
         ctx.fillRect(0, 0, W, H)
 
+        // Graph paper grid
+        const gSize = 24
+        const gCol = bg === "black" ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.06)"
+        ctx.strokeStyle = gCol
+        ctx.lineWidth = 1
+        ctx.beginPath()
+        for (let x = 0; x <= W; x += gSize) { ctx.moveTo(x + 0.5, 0); ctx.lineTo(x + 0.5, H) }
+        for (let y = 0; y <= H; y += gSize) { ctx.moveTo(0, y + 0.5); ctx.lineTo(W, y + 0.5) }
+        ctx.stroke()
+
+        // Radial fade: solid center fading out, revealing grid at edges
+        const grad = ctx.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, Math.max(W, H) * 0.55)
+        grad.addColorStop(0, canvasBgHex)
+        grad.addColorStop(1, "transparent")
+        ctx.fillStyle = grad
+        ctx.fillRect(0, 0, W, H)
+
         // Title + subtitle (canvas-drawn text — sharp, no glyph doubling).
         if (titleBox && titleEl) {
           const fs = parseFloat(getComputedStyle(titleEl).fontSize)
@@ -473,6 +505,33 @@ export default function DevSocialPage() {
           ctx.font = `400 ${l.fontSize}px ${l.font}`
           ctx.fillText(l.text, l.cx, l.baseline)
         })
+
+        // Logo watermark at the bottom
+        if (logoBox && logoEl) {
+          ctx.save()
+          ctx.globalAlpha = 0.4
+          const lx = logoBox.left - rootRect.left
+          const ly = logoBox.top - rootRect.top
+          // Draw the shield icon as a path
+          const iconSize = 20
+          ctx.fillStyle = textCol
+          ctx.save()
+          ctx.translate(lx, ly + 1)
+          const s = iconSize / 512
+          ctx.scale(s, s)
+          const p1 = new Path2D("M148.02,363.76c-4.48,0-8.64-2.42-10.86-6.32l-54.29-95.68c-2.15-3.8-2.15-8.52,0-12.32l54.29-95.68c2.21-3.9,6.37-6.32,10.86-6.32h18.51c4.44,0,8.45,2.28,10.73,6.09,2.27,3.82,2.37,8.43.25,12.33l-42.23,77.99c-3.98,7.36-3.98,16.14,0,23.49l22.22,41.02c4.25,7.85,12.43,12.8,21.36,12.92,0,0,45.08.61,45.11.61,8.68,0,16.83-4.64,21.26-12.12l24.87-41.99c2.23-3.77,6.34-6.11,10.72-6.12l19.47-.04c4.48,0,8.49,2.29,10.76,6.12,2.27,3.83,2.35,8.45.21,12.35l-42.2,77.17c-2.19,4-6.39,6.49-10.95,6.49h-110.08Z")
+          const p2 = new Path2D("M346.7,363.69c-4.44,0-8.45-2.28-10.73-6.09-2.27-3.82-2.37-8.43-.25-12.33l42.23-77.99c3.98-7.35,3.98-16.14,0-23.49l-22.22-41.02c-4.25-7.85-12.44-12.8-21.36-12.92,0,0-46.51-.63-46.53-.63-8.88,0-17.12,4.81-21.48,12.54l-23.35,41.36c-2.2,3.9-6.36,6.34-10.84,6.35l-19.21.04c-4.48,0-8.49-2.29-10.76-6.12-2.27-3.83-2.35-8.45-.22-12.36l42.2-77.17c2.19-4.01,6.39-6.5,10.95-6.5h110.08c4.48,0,8.64,2.42,10.86,6.32l54.29,95.68c2.16,3.8,2.16,8.52,0,12.32l-54.29,95.68c-2.21,3.9-6.37,6.32-10.86,6.32h-18.51Z")
+          ctx.fill(p1)
+          ctx.fill(p2)
+          ctx.restore()
+          // Draw "shieldcn.dev" text next to the icon
+          ctx.fillStyle = textCol
+          ctx.font = '500 14px "Geist Mono", ui-monospace, monospace'
+          ctx.textAlign = "left"
+          ctx.textBaseline = "middle"
+          ctx.fillText("shieldcn.dev", lx + iconSize + 8, ly + iconSize / 2 + 1)
+          ctx.restore()
+        }
       }
 
       // ── Static → PNG ───────────────────────────────────────────────────
@@ -553,6 +612,19 @@ export default function DevSocialPage() {
   const textColor = bg === "black" ? "#ffffff" : "#09090b"
   const subColor = bg === "black" ? "rgba(255,255,255,0.6)" : "rgba(9,9,11,0.55)"
 
+  // Graph paper grid settings
+  const gridSize = 24
+  const gridColor = bg === "black" ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.06)"
+  const gridStyle: React.CSSProperties = {
+    backgroundImage: [
+      `linear-gradient(${gridColor} 1px, transparent 1px)`,
+      `linear-gradient(90deg, ${gridColor} 1px, transparent 1px)`,
+      // radial fade: solid center → transparent edges, revealing the grid only at edges
+      `radial-gradient(ellipse at center, ${canvasBg} 0%, transparent 35%)`,
+    ].join(", "),
+    backgroundSize: `${gridSize}px ${gridSize}px, ${gridSize}px ${gridSize}px, 100% 100%`,
+  }
+
   return (
     <div className="min-h-screen bg-[#09090b] text-zinc-100">
       {/* Toolbar */}
@@ -613,6 +685,11 @@ export default function DevSocialPage() {
             title text
           </label>
 
+          <label className="flex items-center gap-1.5 cursor-pointer font-mono text-[11px] text-zinc-500">
+            <input type="checkbox" checked={showLogo} onChange={(e) => setShowLogo(e.target.checked)} className="rounded border-zinc-700" />
+            logo
+          </label>
+
 
           {showText && (
             <>
@@ -644,9 +721,10 @@ export default function DevSocialPage() {
         <div className="flex justify-center overflow-auto rounded-lg border border-zinc-800 bg-[#0c0c0f] p-6">
           <div
             ref={canvasRef}
-            className="flex shrink-0 flex-col items-center justify-center"
+            className="relative flex shrink-0 flex-col items-center justify-center"
             style={{
               backgroundColor: canvasBg,
+              ...gridStyle,
               width: isTight ? "auto" : p.width,
               height: isTight ? "auto" : p.height,
               padding: isTight ? `${Math.max(gap, 24)}px ${Math.max(gap, 32)}px` : 48,
@@ -664,7 +742,7 @@ export default function DevSocialPage() {
                 const caption = labelFor(item)
                 return (
                   <div
-                    key={`${item.id}-${item.variant}-${item.size}-${item.animate}-${bg}`}
+                    key={`${item.id}-${item.variant}-${item.size}-${item.font}-${item.animate}-${bg}`}
                     className="flex flex-col items-center"
                     style={{ gap: caption ? 10 : 0 }}
                   >
@@ -681,6 +759,15 @@ export default function DevSocialPage() {
                 )
               })}
             </div>
+            {showLogo && (
+              <div data-canvas-logo className="flex items-center gap-2" style={{ opacity: 0.4, position: "absolute", bottom: 16, left: "50%", transform: "translateX(-50%)" }}>
+                <svg viewBox="0 0 512 512" width={20} height={20} fill={textColor}>
+                  <path d="M148.02,363.76c-4.48,0-8.64-2.42-10.86-6.32l-54.29-95.68c-2.15-3.8-2.15-8.52,0-12.32l54.29-95.68c2.21-3.9,6.37-6.32,10.86-6.32h18.51c4.44,0,8.45,2.28,10.73,6.09,2.27,3.82,2.37,8.43.25,12.33l-42.23,77.99c-3.98,7.36-3.98,16.14,0,23.49l22.22,41.02c4.25,7.85,12.43,12.8,21.36,12.92,0,0,45.08.61,45.11.61,8.68,0,16.83-4.64,21.26-12.12l24.87-41.99c2.23-3.77,6.34-6.11,10.72-6.12l19.47-.04c4.48,0,8.49,2.29,10.76,6.12,2.27,3.83,2.35,8.45.21,12.35l-42.2,77.17c-2.19,4-6.39,6.49-10.95,6.49h-110.08Z" />
+                  <path d="M346.7,363.69c-4.44,0-8.45-2.28-10.73-6.09-2.27-3.82-2.37-8.43-.25-12.33l42.23-77.99c3.98-7.35,3.98-16.14,0-23.49l-22.22-41.02c-4.25-7.85-12.44-12.8-21.36-12.92,0,0-46.51-.63-46.53-.63-8.88,0-17.12,4.81-21.48,12.54l-23.35,41.36c-2.2,3.9-6.36,6.34-10.84,6.35l-19.21.04c-4.48,0-8.49-2.29-10.76-6.12-2.27-3.83-2.35-8.45-.22-12.36l42.2-77.17c2.19-4.01,6.39-6.5,10.95-6.5h110.08c4.48,0,8.64,2.42,10.86,6.32l54.29,95.68c2.16,3.8,2.16,8.52,0,12.32l-54.29,95.68c-2.21,3.9-6.37,6.32-10.86,6.32h-18.51Z" />
+                </svg>
+                <span style={{ fontSize: 14, fontWeight: 500, color: textColor, fontFamily: "var(--font-geist-mono), ui-monospace, monospace", letterSpacing: "0.02em" }}>shieldcn.dev</span>
+              </div>
+            )}
           </div>
         </div>
 
