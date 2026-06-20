@@ -16,7 +16,7 @@
 "use client"
 
 import { useState, useCallback, useEffect, useRef, useMemo } from "react"
-import { RotateCcw, Code2, Link } from "lucide-react"
+import { RotateCcw, Code2, Link, ChevronDown } from "lucide-react"
 import { LogoPicker } from "@/components/logo-picker"
 import { SearchablePicker, type SearchablePickerFilter, type SearchablePickerSection } from "@/components/searchable-picker"
 import { ColorSwatch } from "@/components/color-input"
@@ -239,10 +239,14 @@ export function BadgeBuilderCore({
   children,
 }: BadgeBuilderCoreProps) {
   const [showRawPath, setShowRawPath] = useState(false)
+  const [showAdvanced, setShowAdvanced] = useState(false)
   const [imgError, setImgError] = useState(false)
   const [presetSearch, setPresetSearch] = useState("")
   const [presetServiceFilter, setPresetServiceFilter] = useState("all")
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(null)
+
+  // Single debounce window for all text inputs that feed the badge URL.
+  const URL_DEBOUNCE_MS = 300
 
   // --- Preset state ---
   const initialMatch = useMemo(() => findMatchingPreset(s.path), []) // eslint-disable-line react-hooks/exhaustive-deps
@@ -318,7 +322,7 @@ export function BadgeBuilderCore({
       const nextAutoLink = resolveDefaultLinkUrl(selectedPreset, next)
       const isAutoLink = !s.linkUrl || s.linkUrl === prevAutoLink
       updatePath(selectedPreset, next, isAutoLink ? { linkUrl: nextAutoLink } : undefined)
-    }, 300)
+    }, URL_DEBOUNCE_MS)
   }, [paramValues, selectedPreset, updatePath, s.linkUrl])
 
   // --- Raw path editing (advanced) ---
@@ -329,7 +333,7 @@ export function BadgeBuilderCore({
     debounceRef.current = setTimeout(() => {
       onChange(clampVariant({ ...s, path: val }))
       setImgError(false)
-    }, 400)
+    }, URL_DEBOUNCE_MS)
   }, [s, onChange])
 
   const prevPath = useRef(s.path)
@@ -386,6 +390,7 @@ export function BadgeBuilderCore({
     for (const p of BADGE_PRESETS[0].params) defaults[p.key] = p.default
     setParamValues(defaults)
     setShowRawPath(false)
+    setShowAdvanced(false)
     setPresetSearch("")
     setPresetServiceFilter("all")
   }, [onChange])
@@ -417,7 +422,7 @@ export function BadgeBuilderCore({
             {imgError ? "Failed to load — check your settings" : "Configure your badge below"}
           </span>
         )}
-        <span className="absolute right-3 top-3 rounded-md border border-border/40 bg-background/60 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground backdrop-blur-sm">
+        <span className="absolute right-3 top-3 rounded-md border border-border/40 bg-background/60 px-1.5 py-0.5 text-xs font-medium text-muted-foreground backdrop-blur-sm">
           {s.mode}
         </span>
       </div>
@@ -442,9 +447,11 @@ export function BadgeBuilderCore({
               variant="ghost"
               size="sm"
               onClick={handleReset}
+              tabIndex={isDefault ? -1 : 0}
+              aria-hidden={isDefault}
               className={cn(
                 "text-muted-foreground text-xs gap-1.5 h-7",
-                isDefault && "invisible",
+                isDefault && "invisible pointer-events-none",
               )}
             >
               <RotateCcw className="size-3" />
@@ -503,10 +510,11 @@ export function BadgeBuilderCore({
                 <button
                   key={v}
                   onClick={() => set("variant", v)}
+                  aria-pressed={s.variant === v}
                   className={cn(
                     "flex items-center justify-center rounded-lg px-1 py-2.5 transition-colors",
                     s.variant === v
-                      ? "bg-foreground/10 ring-1 ring-foreground/20"
+                      ? "bg-primary/10 ring-1 ring-primary"
                       : "hover:bg-muted/60",
                   )}
                 >
@@ -518,7 +526,7 @@ export function BadgeBuilderCore({
                       className="h-[26px] select-none"
                     />
                   ) : (
-                    <span className="text-[11px] text-muted-foreground">
+                    <span className="text-xs text-muted-foreground">
                       {VARIANT_LABELS[v] ?? v}
                     </span>
                   )}
@@ -536,7 +544,19 @@ export function BadgeBuilderCore({
             </div>
           </div>
 
+          {/* ── Advanced disclosure: icon, link, colors, raw path ── */}
           <div className="h-px bg-border/50" />
+          <button
+            onClick={() => setShowAdvanced(!showAdvanced)
+            }
+            aria-expanded={showAdvanced}
+            className="flex w-full items-center gap-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <ChevronDown className={cn("size-3.5 transition-transform", showAdvanced && "rotate-180")} />
+            Advanced customization
+          </button>
+          <Reveal open={showAdvanced}>
+          <div className="space-y-5 pt-1">
 
           {/* ── Row 3: Icon ── */}
           <div className="space-y-2">
@@ -560,11 +580,11 @@ export function BadgeBuilderCore({
                 value={s.linkUrl}
                 onChange={e => set("linkUrl", e.target.value)}
                 placeholder="https://… — where the badge links to when clicked"
-                className="h-9 pl-8 text-sm"
+                className="h-8 pl-8 text-xs"
               />
             </div>
             {s.linkUrl && (
-              <p className="text-[10px] text-muted-foreground/50">
+              <p className="text-xs text-muted-foreground/60">
                 Badge will be wrapped in a clickable link in Markdown/HTML output.
               </p>
             )}
@@ -610,7 +630,7 @@ export function BadgeBuilderCore({
           <div className="pt-1">
             <button
               onClick={() => setShowRawPath(!showRawPath)}
-              className="flex items-center gap-1.5 text-[11px] text-muted-foreground/60 hover:text-muted-foreground transition-colors"
+              className="flex items-center gap-1.5 text-xs text-muted-foreground/60 hover:text-muted-foreground transition-colors"
             >
               <Code2 className="size-3" />
               {showRawPath ? "Hide" : "Edit"} raw path
@@ -623,12 +643,14 @@ export function BadgeBuilderCore({
                   placeholder="/npm/react.svg"
                   className="font-mono text-xs h-8"
                 />
-                <p className="text-[10px] text-muted-foreground/50">
+                <p className="text-xs text-muted-foreground/60">
                   Overrides the badge type selector
                 </p>
               </div>
             </Reveal>
           </div>
+          </div>
+          </Reveal>
         </div>
       </div>
     </div>
@@ -655,7 +677,7 @@ function Reveal({ open, children }: { open: boolean; children: React.ReactNode }
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground/70">
+    <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground/70">
       {children}
     </span>
   )
@@ -678,7 +700,7 @@ function Ctrl({
     <div className="space-y-1.5">
       <Label className="text-xs text-muted-foreground">{label}</Label>
       <Select value={value} onValueChange={onChange}>
-        <SelectTrigger className="h-8 w-full text-xs">
+        <SelectTrigger className="h-9 w-full text-sm">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
