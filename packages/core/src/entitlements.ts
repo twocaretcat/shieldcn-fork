@@ -2,7 +2,7 @@
  * @shieldcn/core
  * src/entitlements.ts
  *
- * Plan resolution for the Plus/Pro tiers. The Polar webhook writes the
+ * Plan resolution for the single paid Plus tier. The Polar webhook writes the
  * `subscriptions` row; everything else reads the plan through getPlan(), which
  * is cached briefly so hot paths (brand resolution, dashboard, API gates) don't
  * hit Postgres on every request.
@@ -10,14 +10,14 @@
  * Ownership is personal-first: an owner id is either a personal user id or an
  * active organization id. A subscription entitles whichever owner bought it.
  *
- * Plan hierarchy: free < plus < pro. `pro` implies every `plus` capability.
+ * Plan hierarchy: free < plus.
  */
 
 import { query } from "./db"
 
-export type Plan = "free" | "plus" | "pro"
+export type Plan = "free" | "plus"
 
-const PLAN_RANK: Record<Plan, number> = { free: 0, plus: 1, pro: 2 }
+const PLAN_RANK: Record<Plan, number> = { free: 0, plus: 1 }
 
 /** A subscription is entitled only while active/trialing and unexpired. */
 const ACTIVE_STATUSES = new Set(["active", "trialing"])
@@ -31,12 +31,31 @@ const cache = new Map<string, CacheEntry>()
 const TTL_MS = 60_000
 
 /**
+ * Dev-only plan override. Returns the forced plan ONLY when both hold:
+ *   1. NODE_ENV is not "production" (never active in a prod build), and
+ *   2. DEV_PLAN is set to a valid plan ("free" | "plus").
+ * This lets local development exercise Plus-gated features (caps, gates)
+ * without a real Polar subscription. Both guards must pass, so it is
+ * impossible to trigger on a deployed production server.
+ */
+function devPlanOverride(): Plan | null {
+  if (process.env.NODE_ENV === "production") return null
+  const forced = process.env.DEV_PLAN
+  if (forced === "plus" || forced === "free") return forced
+  return null
+}
+
+/**
  * Resolve the effective plan for an organization. Returns "free" for unknown
  * orgs, lapsed subscriptions, or when billing is not configured. Fail-open to
  * "free" on any error — a billing lookup must never break a request path.
  */
 export async function getPlan(ownerId: string | null | undefined): Promise<Plan> {
   if (!ownerId) return "free"
+
+  // Local dev escape hatch (guarded to non-production + explicit opt-in).
+  const forced = devPlanOverride()
+  if (forced) return forced
 
   const cached = cache.get(ownerId)
   if (cached && cached.expires > Date.now()) return cached.plan
@@ -58,8 +77,8 @@ export async function getPlan(ownerId: string | null | undefined): Promise<Plan>
       const unexpired =
         !row.current_period_end ||
         new Date(row.current_period_end).getTime() > Date.now()
-      if (unexpired && (row.plan === "plus" || row.plan === "pro")) {
-        plan = row.plan
+      if (unexpired && row.plan === "plus") {
+        plan = "plus"
       }
     }
   } catch {
@@ -71,7 +90,7 @@ export async function getPlan(ownerId: string | null | undefined): Promise<Plan>
   return plan
 }
 
-/** True when the org's plan is at least `min` in the free<plus<pro hierarchy. */
+/** True when the org's plan is at least `min` in the free<plus hierarchy. */
 export async function hasPlan(
   ownerId: string | null | undefined,
   min: Plan,
@@ -91,7 +110,6 @@ export function invalidatePlan(ownerId: string): void {
  */
 export function planForProduct(productId: string | null | undefined): Plan {
   if (!productId) return "free"
-  if (productId === process.env.POLAR_PRODUCT_PRO) return "pro"
   if (productId === process.env.POLAR_PRODUCT_PLUS) return "plus"
   return "free"
 }
