@@ -78,6 +78,7 @@ import {
 import {
   BLOCK_LABELS,
   documentToMarkdown,
+  normalizeBlocks,
   makeBlock,
   makeStarterDocument,
   newId,
@@ -96,7 +97,6 @@ import {
   type ContributorsBlock,
 } from "@/lib/studio-shared"
 import { markdownToDocument } from "@/lib/studio-import"
-import { StudioCloudMenu } from "@/components/studio/cloud-menu"
 
 const STORAGE_KEY = "shieldcn:studio:v1"
 const SETTINGS_KEY = "shieldcn:studio:settings:v1"
@@ -122,7 +122,9 @@ function loadBlocks(): Block[] | null {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) return null
     const parsed = JSON.parse(raw)
-    if (Array.isArray(parsed) && parsed.length > 0) return parsed as Block[]
+    // Backfill any schema fields added since this doc was persisted, so older
+    // saved docs (e.g. badge states without `brand`) don't crash on render.
+    if (Array.isArray(parsed) && parsed.length > 0) return normalizeBlocks(parsed as Block[])
     return null
   } catch {
     return null
@@ -604,25 +606,6 @@ export function Studio() {
     reader.readAsText(file)
   }, [])
 
-  // --- cloud / AI / brand (Plus) accessors --------------------------------
-  // Small state accessors handed to the cloud menu so it can save/open/replace
-  // the document without reaching into Studio's internals.
-  const loadProject = useCallback((nextBlocks: Block[], nextThemeAware: boolean) => {
-    setBlocks(nextBlocks)
-    setSelectedId(nextBlocks[0]?.id ?? null)
-    setThemeAware(nextThemeAware)
-  }, [])
-  const getMarkdown = useCallback(
-    () => documentToMarkdown(blocks, baseUrl, themeAware),
-    [blocks, baseUrl, themeAware],
-  )
-  const applyMarkdown = useCallback((md: string) => {
-    const next = markdownToDocument(md, baseUrl)
-    if (next.length === 0) return
-    setBlocks(next)
-    setSelectedId(next[0]?.id ?? null)
-  }, [baseUrl])
-
   if (!hydrated) {
     return <div className="flex h-[60vh] items-center justify-center text-sm text-muted-foreground">Loading studio…</div>
   }
@@ -757,17 +740,6 @@ export function Studio() {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-
-          <Separator orientation="vertical" className="mx-0.5 hidden h-5 sm:block" />
-
-          {/* CLOUD / AI / BRAND — Plus features (save, open, generate) */}
-          <StudioCloudMenu
-            blocks={blocks}
-            themeAware={themeAware}
-            loadProject={loadProject}
-            getMarkdown={getMarkdown}
-            applyMarkdown={applyMarkdown}
-          />
 
           <Separator orientation="vertical" className="mx-0.5 hidden h-5 sm:block" />
 
